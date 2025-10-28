@@ -84,18 +84,25 @@ class RoboDogBrain:
         text: str,
         confidence: float = 0.85,
         reward_bias: float = 0.5,
-        mood: float = 0.0,
+        mood: float | None = None,
+        energy_level: float | None = None,
     ) -> dict[str, Any]:
         action = self._action_from_text(text)
         context = dict(self.behavior_context)
         context["action_known"] = 1.0 if action != "NONE" else 0.0
         context["reward_available"] = 1.0 if self.reward_map.get(action, False) else 0.0
+        resolved_mood = 0.0 if mood is None else mood
+        resolved_energy = (
+            self.behavior_defaults["energy_level"]
+            if energy_level is None
+            else energy_level
+        )
         inputs = BehaviorInputs(
             stimulus=1.0 if action != "NONE" else 0.0,
             confidence=confidence,
             reward_bias=reward_bias,
-            mood=mood,
-            energy_level=self.behavior_defaults["energy_level"],
+            mood=resolved_mood,
+            energy_level=resolved_energy,
             proximity=self.behavior_defaults["proximity"],
             threat_level=self.behavior_defaults["threat_level"],
             social_context=self.behavior_defaults["social_context"],
