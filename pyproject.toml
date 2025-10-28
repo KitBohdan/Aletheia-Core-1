@@ -31,7 +31,7 @@ select = ["E","F","I","UP"]
 ignore = ["E501"]
 
 [tool.pytest.ini_options]
-addopts = "-ra -q --cov=. --cov-report=xml"
+addopts = "-ra -q --cov=vct --cov-report=xml"
 testpaths = ["tests"]
 python_files = "test_*.py"
 
