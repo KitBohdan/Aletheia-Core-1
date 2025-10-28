@@ -1,5 +1,5 @@
+black
+coverage
 pytest
 pytest-cov
-coverage
 ruff
-black
