@@ -34,6 +34,10 @@ ignore = ["E501"]
 addopts = "-ra -q --cov=vct --cov-report=xml"
 testpaths = ["tests"]
 python_files = "test_*.py"
+markers = [
+  "slow: повільні тести",
+  "db: тести з БД",
+]
 
 [tool.coverage.run]
 branch = true
