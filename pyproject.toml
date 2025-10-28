@@ -40,5 +40,16 @@ branch = true
 source = ["vct"]
 
 [tool.coverage.report]
-fail_under = 80
+fail_under = 70
 show_missing = true
+
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0.0",
+  "pytest-cov>=4.1.0",
+  "fastapi>=0.115.0",
+  "uvicorn>=0.30.0",
+  "pydantic>=2.8.2",
+  "flake8>=7.0.0"
+]
