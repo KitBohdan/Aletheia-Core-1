@@ -8,3 +8,7 @@ commands_map:
   голос: BARK
 reward_triggers: {SIT: true, LIE_DOWN: true, COME: true, BARK: false}
 mood_initial: CALM
+tts:
+  provider: gtts
+  language: uk
+  voice: com.ua
