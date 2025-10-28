@@ -105,6 +105,63 @@ def overrides_from_iter(items: Iterable[str]) -> dict[str, Any]:
     return overrides
 
 
+def _deep_merge_dict(
+    base: Mapping[str, Any], updates: Mapping[str, Any]
+) -> dict[str, Any]:
+    """Recursively merge two mapping objects."""
+
+    merged: dict[str, Any] = dict(base)
+    for key, value in updates.items():
+        existing = merged.get(key)
+        if isinstance(existing, Mapping) and isinstance(value, Mapping):
+            merged[key] = _deep_merge_dict(existing, value)
+        else:
+            merged[key] = value
+    return merged
+
+
+def _apply_overrides(
+    data: Mapping[str, Any], overrides: Mapping[str, Any]
+) -> dict[str, Any]:
+    """Apply dotted overrides to a configuration mapping."""
+
+    merged: dict[str, Any] = dict(data)
+    for raw_key, value in overrides.items():
+        key = raw_key.strip()
+        if not key:
+            continue
+        if "." not in key:
+            existing = merged.get(key)
+            if isinstance(existing, Mapping) and isinstance(value, Mapping):
+                merged[key] = _deep_merge_dict(existing, value)
+            else:
+                merged[key] = value
+            continue
+
+        parts = [part for part in key.split(".") if part]
+        if not parts:
+            continue
+
+        cursor: dict[str, Any] = merged
+        for part in parts[:-1]:
+            existing = cursor.get(part)
+            if isinstance(existing, Mapping):
+                next_node: dict[str, Any] = dict(existing)
+            else:
+                next_node = {}
+            cursor[part] = next_node
+            cursor = next_node
+
+        final_key = parts[-1]
+        existing = cursor.get(final_key)
+        if isinstance(existing, Mapping) and isinstance(value, Mapping):
+            cursor[final_key] = _deep_merge_dict(existing, value)
+        else:
+            cursor[final_key] = value
+
+    return merged
+
+
 def load_config(
     path: str | Path | None = None,
     *,
@@ -125,8 +182,7 @@ def load_config(
         raise ValueError(f"Unsupported configuration format: {raw_path.suffix}")
 
     if overrides:
-        data = dict(data)
-        data.update(overrides)
+        data = _apply_overrides(data, overrides)
 
     try:
         return cast(RoboDogConfig, RoboDogConfig.model_validate(data))
