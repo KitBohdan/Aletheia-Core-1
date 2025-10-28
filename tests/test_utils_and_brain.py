@@ -1,6 +1,10 @@
+import pytest
 
 from vct.utils.logging import get_logger
 from vct.robodog.dog_bot_brain import RoboDogBrain
+
+
+pytestmark = pytest.mark.slow
 
 def test_get_logger_idempotent():
     log1 = get_logger("vct.test")
