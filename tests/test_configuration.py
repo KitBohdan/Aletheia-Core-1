@@ -55,4 +55,3 @@ def test_override_parser_handles_types():
     overrides = overrides_from_iter(["reward_triggers.SIT=true", "weights.mood=0.2"])
     assert overrides["reward_triggers.SIT"] is True
     assert overrides["weights.mood"] == pytest.approx(0.2)
-

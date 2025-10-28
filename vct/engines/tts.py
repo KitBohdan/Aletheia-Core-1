@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 from tempfile import NamedTemporaryFile
-from typing import Any, Dict, Optional
+from typing import Any
 
 
 class TTSEngineBase:
@@ -25,7 +25,7 @@ class Pyttsx3TTS(TTSEngineBase):
 
     def __init__(self) -> None:
         try:  # pragma: no cover - depends on optional dependency
-            import pyttsx3  # type: ignore
+            import pyttsx3
 
             self.engine = pyttsx3.init()
         except Exception:  # pragma: no cover - graceful degradation
@@ -48,18 +48,18 @@ class GTTSTTS(TTSEngineBase):
     def __init__(
         self,
         language: str = "en",
-        voice: Optional[str] = None,
+        voice: str | None = None,
         slow: bool = False,
     ) -> None:
         self.language = language
         self.voice = voice or "com"
         self.slow = slow
-        self._gtts_cls = None
-        self._playsound = None
-        self._error: Optional[str] = None
+        self._gtts_cls: type[Any] | None = None
+        self._playsound: Any | None = None
+        self._error: str | None = None
         try:  # pragma: no cover - depends on optional dependency
-            from gtts import gTTS  # type: ignore
-            from playsound import playsound  # type: ignore
+            from gtts import gTTS
+            from playsound import playsound
 
             self._gtts_cls = gTTS
             self._playsound = playsound
@@ -106,11 +106,11 @@ class TTSConfig:
 
     provider: str = "auto"
     language: str = "en"
-    voice: Optional[str] = None
+    voice: str | None = None
     slow: bool = False
 
     @classmethod
-    def from_mapping(cls, cfg: Optional[Dict[str, Any]]) -> "TTSConfig":
+    def from_mapping(cls, cfg: dict[str, Any] | None) -> TTSConfig:
         if not cfg:
             return cls()
         return cls(
@@ -121,7 +121,7 @@ class TTSConfig:
         )
 
 
-def create_tts_engine(cfg: Optional[Dict[str, Any]] = None) -> TTSEngineBase:
+def create_tts_engine(cfg: dict[str, Any] | None = None) -> TTSEngineBase:
     """Factory that returns the most appropriate TTS engine."""
 
     options = TTSConfig.from_mapping(cfg)
@@ -130,11 +130,11 @@ def create_tts_engine(cfg: Optional[Dict[str, Any]] = None) -> TTSEngineBase:
     if provider in {"print", "console"}:
         return PrintTTS()
     if provider == "pyttsx3":
-        engine = Pyttsx3TTS()
-        return engine if engine.is_usable() else PrintTTS()
+        pytt_engine = Pyttsx3TTS()
+        return pytt_engine if pytt_engine.is_usable() else PrintTTS()
     if provider == "gtts":
-        engine = GTTSTTS(language=options.language, voice=options.voice, slow=options.slow)
-        return engine if engine.is_usable() else PrintTTS()
+        gtts_engine = GTTSTTS(language=options.language, voice=options.voice, slow=options.slow)
+        return gtts_engine if gtts_engine.is_usable() else PrintTTS()
 
     if provider == "auto":
         gtts_engine = GTTSTTS(language=options.language, voice=options.voice, slow=options.slow)

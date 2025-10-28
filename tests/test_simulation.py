@@ -1,21 +1,14 @@
-import sys
-from pathlib import Path
+from __future__ import annotations
 
 import pytest
-
-pytest.importorskip("pydantic")
-
-ROOT = Path(__file__).resolve().parents[1]
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
 
 from vct.robodog.dog_bot_brain import RoboDogBrain
 from vct.simulation.dog_env import DogEnv
 
 
 class DummyBrain:
-    def __init__(self):
-        self.calls: list[dict[str, float | None]] = []
+    def __init__(self) -> None:
+        self.calls: list[dict[str, float | bool | str | None]] = []
 
     def handle_command(
         self,
@@ -37,7 +30,7 @@ class DummyBrain:
         return {"action": "SIT", "score": 0.8, "rewarded": False}
 
 
-def test_dog_env_passes_state_to_brain():
+def test_dog_env_passes_state_to_brain() -> None:
     env = DogEnv(seed=123)
     env.s.mood = 0.25
     env.s.fatigue = 0.6
@@ -53,7 +46,7 @@ def test_dog_env_passes_state_to_brain():
     assert call["energy_level"] == pytest.approx(0.4)
 
 
-def test_dog_env_closed_loop_with_robo_brain():
+def test_dog_env_closed_loop_with_robo_brain() -> None:
     env = DogEnv(seed=1)
     brain = RoboDogBrain(cfg_path="vct/config.yaml", simulate=True)
 

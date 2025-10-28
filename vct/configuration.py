@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping, MutableMapping
-from pathlib import Path
-from typing import Any
-
 import json
+from collections.abc import Iterable, Mapping
+from pathlib import Path
+from typing import Any, cast
 
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
@@ -58,122 +57,78 @@ class RoboDogConfig(BaseModel):
     weights: dict[str, float] = Field(default_factory=dict)
     commands_map: dict[str, str] = Field(default_factory=dict)
     reward_triggers: dict[str, bool] = Field(default_factory=dict)
-    mood_initial: str = Field(default="CALM")
-    behavior_defaults: BehaviorDefaults = Field(default_factory=BehaviorDefaults)
     tts: TTSOptions = Field(default_factory=TTSOptions)
+    behavior_defaults: BehaviorDefaults = Field(default_factory=BehaviorDefaults)
 
-    @field_validator("weights", mode="after")
+    def action_for_command(self, text: str) -> str:
+        normalised = text.strip().lower().replace(" ", "")
+        for key, value in self.commands_map.items():
+            if key.replace(" ", "") in normalised:
+                return value
+        return "NONE"
+
+
+class RewardSchedule(BaseModel):
+    """Simple mapping of actions to reward availability."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    triggers: dict[str, bool] = Field(default_factory=dict)
+
+    @field_validator("triggers", mode="after")
     @classmethod
-    def validate_weights(cls, weights: Mapping[str, Any]) -> dict[str, float]:
-        clean: dict[str, float] = {}
-        for key, raw_value in (weights or {}).items():
-            value = float(raw_value)
-            if not 0.0 <= value <= 1.0:
-                raise ValueError(f"Weight '{key}' must be between 0 and 1 inclusive, got {value}")
-            clean[str(key)] = value
-        return clean
-
-    @field_validator("commands_map", mode="after")
-    @classmethod
-    def normalise_commands(cls, commands: Mapping[str, Any]) -> dict[str, str]:
-        return {str(k).strip(): str(v).strip() for k, v in (commands or {}).items()}
-
-    @field_validator("reward_triggers", mode="after")
-    @classmethod
-    def ensure_bools(cls, triggers: Mapping[str, Any]) -> dict[str, bool]:
-        return {str(k): bool(v) for k, v in (triggers or {}).items()}
+    def _coerce_bool(cls, value: Mapping[str, Any]) -> dict[str, bool]:
+        return {str(k): bool(v) for k, v in value.items()}
 
 
-def _read_config_file(path: Path) -> dict[str, Any]:
-    if not path.exists():
-        raise FileNotFoundError(f"Configuration file not found: {path}")
-
-    text = path.read_text(encoding="utf-8")
-    if not text.strip():
-        return {}
-
-    suffix = path.suffix.lower()
-    if suffix in {".yaml", ".yml"}:
-        data = yaml.safe_load(text)
-    elif suffix == ".json":
-        data = json.loads(text)
-    else:
-        raise ValueError(f"Unsupported configuration format: {suffix}")
-
-    if data is None:
-        return {}
-    if not isinstance(data, dict):
-        raise ValidationError.from_exception_data(
-            "ConfigRootTypeError",
-            [
-                {
-                    "type": "type_error.dict",
-                    "loc": ("__root__",),
-                    "msg": "Configuration root must be a mapping",
-                    "input": data,
-                }
-            ],
-        )
-    return data
-
-
-def _deep_merge(base: MutableMapping[str, Any], overrides: Mapping[str, Any]) -> dict[str, Any]:
-    result: dict[str, Any] = dict(base)
-    for key, value in overrides.items():
-        if isinstance(value, Mapping) and isinstance(result.get(key), Mapping):
-            result[key] = _deep_merge(result[key], value)
-        else:
-            result[key] = value
-    return result
-
-
-def _expand_dotted(overrides: Mapping[str, Any]) -> dict[str, Any]:
-    expanded: dict[str, Any] = {}
-    for key, value in overrides.items():
-        if isinstance(value, Mapping):
-            value_dict = _expand_dotted(value)
-            expanded[key] = _deep_merge(expanded.get(key, {}), value_dict)
-            continue
-        current: MutableMapping[str, Any] = expanded
-        parts = str(key).split(".")
-        for part in parts[:-1]:
-            current = current.setdefault(part, {})  # type: ignore[assignment]
-        current[parts[-1]] = value
-    return expanded
-
-
-def parse_override_value(raw: str) -> Any:
-    lowered = raw.strip().lower()
-    if lowered in {"true", "yes", "on"}:
+def parse_override_value(value: str) -> Any:
+    lowered = value.strip().lower()
+    if lowered in {"true", "on", "yes"}:
         return True
-    if lowered in {"false", "no", "off"}:
+    if lowered in {"false", "off", "no"}:
         return False
     try:
-        if "." in raw:
-            return float(raw)
-        return int(raw)
+        if "." in lowered:
+            return float(lowered)
+        return int(lowered)
     except ValueError:
-        return raw
+        return value
 
 
-def overrides_from_iter(expressions: Iterable[str]) -> dict[str, Any]:
+def overrides_from_iter(items: Iterable[str]) -> dict[str, Any]:
     overrides: dict[str, Any] = {}
-    for expr in expressions:
-        if "=" not in expr:
-            raise ValueError(f"Invalid override expression '{expr}', expected KEY=VALUE")
-        key, raw_value = expr.split("=", 1)
-        overrides[key.strip()] = parse_override_value(raw_value.strip())
+    for item in items:
+        if "=" not in item:
+            raise ValueError(f"Invalid override: {item!r}")
+        key, raw_value = item.split("=", 1)
+        overrides[key.strip()] = parse_override_value(raw_value)
     return overrides
 
 
 def load_config(
     path: str | Path | None = None,
+    *,
     overrides: Mapping[str, Any] | None = None,
 ) -> RoboDogConfig:
-    config_path = Path(path) if path else DEFAULT_CONFIG_PATH
-    raw = _read_config_file(config_path)
-    if overrides:
-        nested = _expand_dotted(overrides)
-        raw = _deep_merge(raw, nested)
-    return RoboDogConfig.model_validate(raw)
+    if path is None:
+        path = DEFAULT_CONFIG_PATH
+    raw_path = Path(path)
+    if not raw_path.exists():
+        raise FileNotFoundError(f"Configuration file not found: {raw_path}")
 
+    if raw_path.suffix.lower() in {".yaml", ".yml"}:
+        with raw_path.open("r", encoding="utf-8") as handle:
+            data = yaml.safe_load(handle) or {}
+    elif raw_path.suffix.lower() == ".json":
+        data = json.loads(raw_path.read_text(encoding="utf-8"))
+    else:
+        raise ValueError(f"Unsupported configuration format: {raw_path.suffix}")
+
+    if overrides:
+        data = dict(data)
+        data.update(overrides)
+
+    try:
+        return cast(RoboDogConfig, RoboDogConfig.model_validate(data))
+    except ValidationError as exc:  # pragma: no cover - validation errors bubble up
+        raise ValueError(f"Invalid configuration: {exc}") from exc
