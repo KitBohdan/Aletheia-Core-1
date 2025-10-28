@@ -24,6 +24,18 @@ class RoboDogBrain:
         self.simulate = simulate
         self.actuator = SimulatedActuator() if (simulate or gpio_pin is None) else GPIOActuator(gpio_pin)
         self.guard = EthicsGuard()
+        defaults = self.cfg.get("behavior_defaults", {})
+        self.behavior_defaults = {
+            "energy_level": float(defaults.get("energy_level", 0.6)),
+            "proximity": float(defaults.get("proximity", 0.5)),
+            "threat_level": float(defaults.get("threat_level", 0.1)),
+            "social_context": float(defaults.get("social_context", 0.5)),
+        }
+        context_defaults = defaults.get("context", {})
+        if isinstance(context_defaults, dict):
+            self.behavior_context = {k: float(v) for k, v in context_defaults.items()}
+        else:
+            self.behavior_context = {}
 
     def _action_from_text(self, text: str) -> str:
         m = self.cfg.get("commands_map", {})
@@ -45,8 +57,20 @@ class RoboDogBrain:
 
     def handle_command(self, text: str, confidence: float = 0.85, reward_bias: float = 0.5, mood: float = 0.0) -> Dict:
         action = self._action_from_text(text)
-        inputs = BehaviorInputs(stimulus=1.0 if action != "NONE" else 0.0,
-                                confidence=confidence, reward_bias=reward_bias, mood=mood)
+        context = dict(self.behavior_context)
+        context["action_known"] = 1.0 if action != "NONE" else 0.0
+        context["reward_available"] = 1.0 if self.reward_map.get(action, False) else 0.0
+        inputs = BehaviorInputs(
+            stimulus=1.0 if action != "NONE" else 0.0,
+            confidence=confidence,
+            reward_bias=reward_bias,
+            mood=mood,
+            energy_level=self.behavior_defaults["energy_level"],
+            proximity=self.behavior_defaults["proximity"],
+            threat_level=self.behavior_defaults["threat_level"],
+            social_context=self.behavior_defaults["social_context"],
+            context=context,
+        )
         vec = self.policy.decide(action, inputs)
         rewarded = self._maybe_reward(vec.action, vec.score)
         feedback = f"Дія: {vec.action} score={vec.score:.2f}" + (" — ✅ винагорода" if rewarded else "")
