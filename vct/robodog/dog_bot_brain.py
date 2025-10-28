@@ -1,6 +1,6 @@
 import time, yaml
 from typing import Optional, Dict
-from ..engines.stt import RuleBasedSTT
+from ..engines.stt import WhisperSTT
 from ..engines.tts import Pyttsx3TTS, PrintTTS
 from ..hardware.gpio_reward import GPIOActuator, SimulatedActuator
 from ..behavior.policy import BehaviorPolicy, BehaviorInputs
@@ -13,7 +13,7 @@ class RoboDogBrain:
     def __init__(self, cfg_path: str, gpio_pin: Optional[int] = None, simulate: bool = False):
         with open(cfg_path, "r", encoding="utf-8") as f:
             self.cfg = yaml.safe_load(f)
-        self.stt = RuleBasedSTT()
+        self.stt = WhisperSTT()
         self.tts = Pyttsx3TTS() if not simulate else PrintTTS()
         self.policy = BehaviorPolicy(self.cfg.get("weights", {}))
         self.reward_map: Dict[str, bool] = self.cfg.get("reward_triggers", {})
