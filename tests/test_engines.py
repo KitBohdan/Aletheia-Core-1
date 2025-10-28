@@ -1,7 +1,9 @@
+import sys
+
 import pytest
 
 from vct.engines.stt import WhisperSTT, RuleBasedSTT
-from vct.engines.tts import PrintTTS
+from vct.engines.tts import PrintTTS, create_tts_engine
 
 
 class _DummyWhisperModel:
@@ -35,3 +37,17 @@ def test_rulebased_stt_alias_emits_warning(tmp_path):
 def test_tts_print_ok():
     tts = PrintTTS()
     tts.speak("Тест")
+
+
+def test_create_tts_engine_unknown_provider():
+    engine = create_tts_engine({"provider": "does-not-exist"})
+    assert isinstance(engine, PrintTTS)
+
+
+def test_create_tts_engine_gtts_fallback(monkeypatch):
+    class _BrokenModule:
+        pass
+
+    monkeypatch.setitem(sys.modules, "gtts", _BrokenModule())
+    engine = create_tts_engine({"provider": "gtts"})
+    assert isinstance(engine, PrintTTS)
