@@ -1,4 +1,9 @@
+import pytest
+
 from vct.robodog.dog_bot_brain import RoboDogBrain
+
+
+pytestmark = pytest.mark.slow
 
 
 def test_brain_handles_text_and_rewards():
@@ -22,4 +27,4 @@ def test_brain_respects_overrides():
 def test_brain_from_wav_rulebased():
     brain = RoboDogBrain(cfg_path="vct/config.yaml", simulate=True)
     out = brain.run_once_from_wav("data/examples/commands/sydity.wav")
-    assert out["action"] in ("SIT","NONE")
+    assert out["action"] in ("SIT", "NONE")

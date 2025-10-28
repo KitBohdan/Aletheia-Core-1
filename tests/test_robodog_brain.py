@@ -1,4 +1,9 @@
+import pytest
+
 from vct.robodog.dog_bot_brain import RoboDogBrain
+
+
+pytestmark = pytest.mark.slow
 
 def test_brain_handle_command_simulated():
     brain = RoboDogBrain(simulate=True)
