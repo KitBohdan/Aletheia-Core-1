@@ -1,5 +1,7 @@
 # VCT RoboDog — Voice Canine Trainer + RoboDog Brain
 
+[![codecov](https://codecov.io/gh/USER/REPO/branch/main/graph/badge.svg)](https://codecov.io/gh/USER/REPO)
+
 LLM-first стек для голосового дресурування собак з GPIO-диспенсером винагород і етичними запобіжниками.
 
 ## Швидкий старт
