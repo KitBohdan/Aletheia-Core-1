@@ -7,6 +7,6 @@ lint:
 	black --check . || true
 	black .
 test:
-	pytest -q --cov=vct --cov-report=term-missing
+	pytest -q
 api:
 	uvicorn vct.api.app:app --reload --port 8000
