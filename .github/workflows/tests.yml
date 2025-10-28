@@ -27,3 +27,7 @@ jobs:
       - run: pip install -e .[dev]
       - run: pytest -q
       - run: coverage xml
+      - uses: actions/upload-artifact@v4
+        with:
+          name: coverage-xml
+          path: coverage.xml
