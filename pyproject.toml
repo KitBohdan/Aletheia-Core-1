@@ -31,9 +31,9 @@ select = ["E","F","I","UP"]
 ignore = ["E501"]
 
 [tool.pytest.ini_options]
-minversion = "8.0"
-addopts = "-q --cov=vct --cov-report=term-missing --cov-report=xml"
+addopts = "-ra -q"
 testpaths = ["tests"]
+python_files = "test_*.py"
 
 [tool.coverage.run]
 branch = true
