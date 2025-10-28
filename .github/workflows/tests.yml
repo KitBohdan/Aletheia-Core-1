@@ -2,8 +2,14 @@ name: tests
 on:
   push:
     branches: [ main ]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/tests.yml'
   pull_request:
     branches: [ main ]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/tests.yml'
   schedule:
     - cron: '0 2 * * *'  # щодня о 02:00 UTC
 concurrency:
