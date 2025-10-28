@@ -20,6 +20,37 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Verify GitHub Actions versions are pinned
+        run: |
+          python3 - <<'PY'
+          import re
+          import sys
+          from pathlib import Path
+
+          pattern = re.compile(r"^\s*uses:\s*([^@\s]+)@([^\s]+)\s*$")
+          allowed_tags = {"v4", "v5"}
+          hex_pattern = re.compile(r"^[0-9a-fA-F]{40}$")
+          errors = []
+
+          workflows_dir = Path('.github/workflows')
+          workflow_files = list(workflows_dir.rglob('*.yml')) + list(workflows_dir.rglob('*.yaml'))
+
+          for workflow in workflow_files:
+              for line_number, line in enumerate(workflow.read_text().splitlines(), start=1):
+                  match = pattern.match(line)
+                  if not match:
+                      continue
+                  version = match.group(2)
+                  if version in allowed_tags or hex_pattern.fullmatch(version):
+                      continue
+                  errors.append((workflow, line_number, line.strip()))
+
+          if errors:
+              print('Found GitHub Actions without pinned versions:', file=sys.stderr)
+              for workflow, line_number, line in errors:
+                  print(f"{workflow}:{line_number}: {line}", file=sys.stderr)
+              sys.exit(1)
+          PY
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
