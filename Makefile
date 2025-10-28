@@ -9,4 +9,4 @@ lint:
 api:
 	uvicorn vct.api.app:app --reload --port 8000
 test:
-	pytest -q
+	pytest -n auto --reruns 2 --reruns-delay 2 -q
