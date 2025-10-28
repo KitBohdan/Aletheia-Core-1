@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import random
-from typing import Any, Dict
+from collections.abc import Mapping
+from dataclasses import dataclass
+from typing import Any
 
 
 def _clamp(value: float, low: float, high: float) -> float:
@@ -17,7 +18,7 @@ class EnvState:
     mood: float = 0.0
     reward_history: float = 0.5
 
-    def to_dict(self) -> Dict[str, float]:
+    def to_dict(self) -> dict[str, float]:
         return {
             "fatigue": float(self.fatigue),
             "mood": float(self.mood),
@@ -26,15 +27,9 @@ class EnvState:
 
 
 class DogEnv:
-    """Lightweight environment modelling the RoboDog internal state.
+    """Lightweight environment modelling the RoboDog internal state."""
 
-    The simulator keeps track of fatigue, mood and reward history which evolve
-    in response to the RoboDog brain outputs.  It can operate in a closed loop
-    with :class:`vct.robodog.dog_bot_brain.RoboDogBrain` to quickly evaluate new
-    behavioural policies without hardware in the loop.
-    """
-
-    def __init__(self, seed: int = 42):
+    def __init__(self, seed: int = 42) -> None:
         self._rng = random.Random(seed)
         self.s = EnvState()
 
@@ -50,12 +45,7 @@ class DogEnv:
         return self.s
 
     def step(self, action: str, score: float) -> dict[str, Any]:
-        """Update the environment using the outcome produced by the brain.
-
-        The probability of a successful action is influenced by the RoboDog's
-        confidence (``score``) and accumulated fatigue.  Success improves the
-        dog's mood while failures lower it and accumulate fatigue.
-        """
+        """Update the environment using the outcome produced by the brain."""
 
         success_p = 0.5 + 0.4 * score - 0.2 * self.s.fatigue
         success = self._rng.random() < _clamp(success_p, 0.05, 0.95)
@@ -79,19 +69,14 @@ class DogEnv:
         confidence: float = 0.85,
         reward_bias: float = 0.5,
     ) -> dict[str, Any]:
-        """Run a single perception-action cycle with the provided brain.
+        """Run a single perception-action cycle with the provided brain."""
 
-        The method feeds the current emotional state (mood) and a derived energy
-        level (``1 - fatigue``) into :meth:`RoboDogBrain.handle_command` before
-        updating the simulator state with the returned decision.
-        """
-
-        brain_output = brain.handle_command(
+        brain_output: Mapping[str, Any] = brain.handle_command(
             command,
             confidence=confidence,
             reward_bias=reward_bias,
             mood=self.s.mood,
             energy_level=_clamp(1.0 - self.s.fatigue, 0.0, 1.0),
         )
-        env_feedback = self.step(brain_output["action"], brain_output["score"])
-        return {"brain": brain_output, "env": env_feedback}
+        env_feedback = self.step(str(brain_output["action"]), float(brain_output["score"]))
+        return {"brain": dict(brain_output), "env": env_feedback}

@@ -1,10 +1,14 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
+
 
 @dataclass
 class EthicsConfig:
     max_session_min: int = 15
     min_inter_reward_s: float = 2.0
     allow_bark_reward: bool = False
+
 
 class EthicsGuard:
     def __init__(self, cfg: EthicsConfig | None = None):

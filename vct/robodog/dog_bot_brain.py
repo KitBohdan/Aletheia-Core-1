@@ -1,4 +1,4 @@
-"""Core RoboDog brain logic bound to the behavioural policy."""
+"""RoboDog brain orchestration logic."""
 
 from __future__ import annotations
 
@@ -10,9 +10,9 @@ from typing import Any
 from ..behavior.policy import BehaviorInputs, BehaviorPolicy
 from ..configuration import DEFAULT_CONFIG_PATH, RoboDogConfig, load_config
 from ..engines.stt import WhisperSTT
-from ..engines.tts import PrintTTS, create_tts_engine
+from ..engines.tts import PrintTTS, TTSEngineBase, create_tts_engine
 from ..ethics.guard import EthicsGuard
-from ..hardware.gpio_reward import GPIOActuator, SimulatedActuator
+from ..hardware.gpio_reward import GPIOActuator, RewardActuatorBase, SimulatedActuator
 from ..utils.logging import get_logger
 
 log = get_logger("RoboDogBrain")
@@ -35,13 +35,11 @@ class RoboDogBrain:
             path = cfg_path or DEFAULT_CONFIG_PATH
             self.config = load_config(path, overrides=config_overrides)
 
-        # Maintain the legacy public attribute exposed as a mapping for
-        # compatibility with earlier integrations.
         self.cfg = self.config.model_dump()
 
-        self.stt = WhisperSTT()
+        self.stt: WhisperSTT = WhisperSTT()
         if simulate:
-            self.tts = PrintTTS()
+            self.tts: TTSEngineBase = PrintTTS()
         else:
             self.tts = create_tts_engine(self.config.tts.model_dump())
 
@@ -49,7 +47,10 @@ class RoboDogBrain:
         self.reward_map: dict[str, bool] = dict(self.config.reward_triggers)
         self.cooldown_s = float(self.config.reward_cooldown_s)
         self.simulate = simulate
-        self.actuator = SimulatedActuator() if (simulate or gpio_pin is None) else GPIOActuator(gpio_pin)
+        if simulate or gpio_pin is None:
+            self.actuator: RewardActuatorBase = SimulatedActuator()
+        else:
+            self.actuator = GPIOActuator(gpio_pin)
         self.guard = EthicsGuard()
 
         defaults = self.config.behavior_defaults
@@ -93,9 +94,7 @@ class RoboDogBrain:
         context["reward_available"] = 1.0 if self.reward_map.get(action, False) else 0.0
         resolved_mood = 0.0 if mood is None else mood
         resolved_energy = (
-            self.behavior_defaults["energy_level"]
-            if energy_level is None
-            else energy_level
+            self.behavior_defaults["energy_level"] if energy_level is None else energy_level
         )
         inputs = BehaviorInputs(
             stimulus=1.0 if action != "NONE" else 0.0,
@@ -110,15 +109,16 @@ class RoboDogBrain:
         )
         vector = self.policy.decide(action, inputs)
         rewarded = self._maybe_reward(vector.action, vector.score)
-        feedback = f"Дія: {vector.action} score={vector.score:.2f}" + (" — ✅ винагорода" if rewarded else "")
+        feedback = f"Дія: {vector.action} score={vector.score:.2f}" + (
+            " — ✅ винагорода" if rewarded else ""
+        )
         self.tts.speak(feedback)
         log.info(feedback)
         return {"action": vector.action, "score": vector.score, "rewarded": rewarded}
 
     def run_once_from_wav(self, wav_path: str) -> dict[str, Any]:
-        text = self.stt.transcribe(wav_path=wav_path)
+        text = self.stt.transcribe(wav_path=Path(wav_path))
         if not text:
             self.tts.speak("Команду не розпізнано")
             return {"action": "NONE", "score": 0.0, "rewarded": False}
         return self.handle_command(text)
-

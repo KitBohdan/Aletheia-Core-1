@@ -1,9 +1,11 @@
+"""Behavior policy module for the RoboDog brain."""
+
 from __future__ import annotations
 
 import math
 import random
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
-from typing import Dict, Iterable, List, Sequence, Tuple
 
 
 @dataclass
@@ -16,20 +18,20 @@ class BehaviorInputs:
     proximity: float = 0.5
     threat_level: float = 0.0
     social_context: float = 0.5
-    context: Dict[str, float] = field(default_factory=dict)
+    context: dict[str, float] = field(default_factory=dict)
 
     def context_signal(self) -> float:
         if not self.context:
             return 0.5
-        values = [self._clamp(float(v)) for v in self.context.values()]
+        values = [self._clamp(float(value)) for value in self.context.values()]
         return sum(values) / len(values)
 
     @staticmethod
     def _clamp(value: float) -> float:
         return max(0.0, min(1.0, value))
 
-    def to_feature_vector(self) -> List[float]:
-        mood_normalised = (self._clamp((self.mood + 1.0) / 2.0))
+    def to_feature_vector(self) -> list[float]:
+        mood_normalised = self._clamp((self.mood + 1.0) / 2.0)
         base_features = [
             self._clamp(self.stimulus),
             self._clamp(self.confidence),
@@ -65,13 +67,13 @@ class BehaviorPolicy:
 
     def __init__(
         self,
-        weights: Dict[str, float] | None = None,
+        weights: dict[str, float] | None = None,
         *,
         hidden_size: int = 8,
         learning_rate: float = 0.05,
         random_seed: int = 42,
         baseline_mix: float = 0.2,
-    ):
+    ) -> None:
         self.learning_rate = learning_rate
         self.hidden_size = hidden_size
         self.random_seed = random_seed
@@ -80,15 +82,17 @@ class BehaviorPolicy:
         random.seed(random_seed)
 
         init_bound = 1.0 / math.sqrt(self.input_size)
-        self.W1: List[List[float]] = [
+        self.W1: list[list[float]] = [
             [random.uniform(-init_bound, init_bound) for _ in range(self.input_size)]
             for _ in range(self.hidden_size)
         ]
-        self.b1: List[float] = [0.0 for _ in range(self.hidden_size)]
-        self.W2: List[float] = [random.uniform(-init_bound, init_bound) for _ in range(self.hidden_size)]
+        self.b1: list[float] = [0.0 for _ in range(self.hidden_size)]
+        self.W2: list[float] = [
+            random.uniform(-init_bound, init_bound) for _ in range(self.hidden_size)
+        ]
         self.b2: float = 0.0
 
-        self.default_weights: Dict[str, float] = {
+        self.default_weights: dict[str, float] = {
             "stimulus": 0.4,
             "confidence": 0.3,
             "reward_bias": 0.2,
@@ -118,8 +122,8 @@ class BehaviorPolicy:
             score += self.legacy_weights.get(name, 0.0) * features[idx]
         return max(0.0, min(1.0, score))
 
-    def _forward(self, features: Sequence[float]) -> Tuple[List[float], float]:
-        hidden: List[float] = []
+    def _forward(self, features: Sequence[float]) -> tuple[list[float], float]:
+        hidden: list[float] = []
         for i in range(self.hidden_size):
             activation = self.b1[i]
             weights = self.W1[i]
@@ -127,16 +131,22 @@ class BehaviorPolicy:
                 activation += weights[j] * value
             hidden.append(math.tanh(activation))
         output_activation = self.b2
-        for i, h in enumerate(hidden):
-            output_activation += self.W2[i] * h
+        for i, hidden_value in enumerate(hidden):
+            output_activation += self.W2[i] * hidden_value
         return hidden, self._sigmoid(output_activation)
 
-    def _backpropagate(self, features: Sequence[float], hidden: Sequence[float], output: float, target: float) -> None:
+    def _backpropagate(
+        self,
+        features: Sequence[float],
+        hidden: Sequence[float],
+        output: float,
+        target: float,
+    ) -> None:
         error = output - target
-        grad_W2: List[float] = [error * h for h in hidden]
+        grad_W2: list[float] = [error * h for h in hidden]
         grad_b2 = error
 
-        grad_hidden: List[float] = []
+        grad_hidden: list[float] = []
         for i in range(self.hidden_size):
             grad_hidden.append((1.0 - hidden[i] ** 2) * self.W2[i] * error)
 
@@ -151,10 +161,10 @@ class BehaviorPolicy:
 
     def train(
         self,
-        dataset: Iterable[Tuple[BehaviorInputs, float]],
+        dataset: Iterable[tuple[BehaviorInputs, float]],
         epochs: int = 50,
     ) -> None:
-        data: List[Tuple[BehaviorInputs, float]] = list(dataset)
+        data = list(dataset)
         if not data:
             return
         for _ in range(max(1, epochs)):
